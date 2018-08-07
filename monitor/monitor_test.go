@@ -23,7 +23,7 @@ import (
 type fakeEthConn struct {
 	filterQueries []ethereum.FilterQuery
 	fakeLogs      []ethtypes.Log
-	number        uint64
+	lastBlock     uint64
 }
 
 func (c *fakeEthConn) FilterLogs(ctx context.Context,
@@ -37,7 +37,7 @@ func (c *fakeEthConn) FilterLogs(ctx context.Context,
 func (c *fakeEthConn) HeaderByNumber(ctx context.Context,
 	number *big.Int) (*ethtypes.Header, error) {
 	return &ethtypes.Header{
-		Number: new(big.Int).SetUint64(c.number),
+		Number: new(big.Int).SetUint64(c.lastBlock),
 	}, nil
 }
 
@@ -71,14 +71,48 @@ func newTestAccount() *data.Account {
 	}
 }
 
+func insertToTestDB(t *testing.T, str reform.Struct) {
+	err := db.Insert(str)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func deleteFromTestDB(t *testing.T, rec reform.Record) {
+	err := db.Delete(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+type testdata struct {
+	mon      *Monitor
+	fakeConn *fakeEthConn
+}
+
+func newTestData(t *testing.T, lastBlock, lastSeen uint64) *testdata {
+	fakeConn := &fakeEthConn{lastBlock: lastBlock}
+	if lastSeen > 0 {
+		insertToTestDB(t, &data.Setting{
+			Key:   data.SettingsLastSeenBlock,
+			Value: "10",
+		})
+	}
+	mon, err := NewMonitor(db, fakeConn, 1, pscAddr, ptcAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &testdata{mon, fakeConn}
+}
+
+func (d *testdata) cleanUp(t *testing.T) {
+	db.DeleteFrom(data.SettingTable, "WHERE key=$1", data.SettingsLastSeenBlock)
+}
+
 var (
 	ptcAddr = common.HexToAddress("0x123")
 	pscAddr = common.HexToAddress("0xabc")
-
-	someAddr = common.HexToAddress("0x111")
-	someHash = common.HexToHash("0xaaa")
-
-	db *reform.DB
+	db      *reform.DB
 )
 
 func TestMain(m *testing.M) {

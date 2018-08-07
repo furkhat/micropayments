@@ -33,5 +33,9 @@ CREATE TABLE channels (
     receipt_signature text -- signature corresponding to last payment
 );
 
+CREATE TABLE settings (
+    key text PRIMARY KEY,
+    value text NOT NULL
+);
 
 END TRANSACTION;

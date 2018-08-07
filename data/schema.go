@@ -45,3 +45,15 @@ type Channel struct {
 	ReceiptBalance   uint    `reform:"receipt_balance"`
 	ReceiptSignature *string `reform:"receipt_signature"`
 }
+
+// System settings keys.
+const (
+	SettingsLastSeenBlock = "system.monitor.lastseenblock"
+)
+
+// Setting is a system settings.
+//reform:settings
+type Setting struct {
+	Key   string `reform:"key,pk"`
+	Value string `reform:"value"`
+}

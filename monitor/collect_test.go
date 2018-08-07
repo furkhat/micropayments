@@ -3,29 +3,29 @@ package monitor
 import (
 	"math/big"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/furkhat/micropayments/contract"
+	"github.com/furkhat/micropayments/data"
 )
 
-var timeout = time.Millisecond * time.Duration(30)
-
 func TestCollectQuery(t *testing.T) {
-	acc := newTestAccount()
-	db.Insert(acc)
-	defer db.Delete(acc)
-	fakeConn := &fakeEthConn{number: 100}
-	mon := NewMonitor(db, fakeConn, 1, pscAddr, ptcAddr)
-	mon.lastSeenBlock = 10
+	td := newTestData(t, 100, 10)
+	defer td.cleanUp(t)
 
+	acc := newTestAccount()
+	insertToTestDB(t, acc)
+	defer deleteFromTestDB(t, acc)
 	ticker := newMockTicker()
-	go mon.start(ticker.C)
+	go td.mon.start(ticker.C)
 	ticker.tick()
-	time.Sleep(timeout)
+	time.Sleep(time.Millisecond * time.Duration(30))
 
 	addresses := []common.Hash{common.HexToAddress(acc.EthAddr).Hash()}
 	expected := []ethereum.FilterQuery{
@@ -43,14 +43,16 @@ func TestCollectQuery(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(expected, fakeConn.filterQueries) {
+	if !reflect.DeepEqual(expected, td.fakeConn.filterQueries) {
 		t.Fatal("unexpected filter queries")
 	}
 }
 
 func TestHandlerCalls(t *testing.T) {
-	fakeConn := &fakeEthConn{}
-	fakeConn.fakeLogs = []ethtypes.Log{
+	td := newTestData(t, 103, 10)
+	defer td.cleanUp(t)
+
+	td.fakeConn.fakeLogs = []ethtypes.Log{
 		ethtypes.Log{
 			Topics:      []common.Hash{contract.EthTokenApproval},
 			BlockNumber: 100},
@@ -64,33 +66,39 @@ func TestHandlerCalls(t *testing.T) {
 			Topics:      []common.Hash{contract.EthChannelCreated},
 			BlockNumber: 103},
 	}
-	mon := NewMonitor(db, fakeConn, 1, pscAddr, ptcAddr)
-	mon.lastSeenBlock = 10
-	var approves, transfers, chanCloses, chanCreates int
-	mon.RegisterWorker(contract.EthTokenApproval, func(*ethtypes.Log) error {
-		approves++
+	var wg sync.WaitGroup
+	wg.Add(4)
+	success := make(chan struct{})
+	go func() {
+		wg.Wait()
+		success <- struct{}{}
+	}()
+	markOneDone := func(*ethtypes.Log) error {
+		wg.Done()
 		return nil
-	})
-	mon.RegisterWorker(contract.EthTokenTransfer, func(*ethtypes.Log) error {
-		transfers++
-		return nil
-	})
-	mon.RegisterWorker(contract.EthCooperativeChannelClose, func(*ethtypes.Log) error {
-		chanCloses++
-		return nil
-	})
-	mon.RegisterWorker(contract.EthChannelCreated, func(*ethtypes.Log) error {
-		chanCreates++
-		return nil
-	})
-	go mon.Start()
-	time.Sleep(time.Millisecond * time.Duration(10))
+	}
+	td.mon.RegisterWorker(contract.EthTokenApproval, markOneDone)
+	td.mon.RegisterWorker(contract.EthTokenTransfer, markOneDone)
+	td.mon.RegisterWorker(contract.EthCooperativeChannelClose, markOneDone)
+	td.mon.RegisterWorker(contract.EthChannelCreated, markOneDone)
+	go td.mon.Start()
 
-	if approves != 1 || transfers != 1 || chanCloses != 1 || chanCreates != 1 {
-		t.Fatal("wrong number of logs collected")
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("not all workers has not been invoked")
+	case <-success:
 	}
 
-	if mon.lastSeenBlock != 103 {
+	if td.mon.lastSeenBlock != 103 {
+		t.Fatal("last seen block not updated")
+	}
+
+	blockSettings := &data.Setting{}
+	err := db.FindByPrimaryKeyTo(blockSettings, data.SettingsLastSeenBlock)
+	if err != nil {
+		t.Fatal("could not find last seen block settings: ", err)
+	}
+	if blockSettings.Value != "103" {
 		t.Fatal("last seen block not updated")
 	}
 }
