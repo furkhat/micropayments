@@ -19,7 +19,7 @@ func TestCollectQuery(t *testing.T) {
 	td := newTestData(t, 100, 10)
 	defer td.cleanUp(t)
 
-	acc := newTestAccount()
+	acc := data.NewAccount()
 	insertToTestDB(t, acc)
 	defer deleteFromTestDB(t, acc)
 	ticker := newMockTicker()

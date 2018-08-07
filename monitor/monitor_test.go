@@ -2,10 +2,6 @@ package monitor
 
 import (
 	"context"
-	"crypto/ecdsa"
-	cryptorand "crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"math/big"
 	"os"
 	"testing"
@@ -14,7 +10,6 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	reform "gopkg.in/reform.v1"
 
 	"github.com/furkhat/micropayments/data"
@@ -55,19 +50,6 @@ func (t *mockTicker) tick() {
 	select {
 	case t.C <- time.Now():
 	default:
-	}
-}
-
-func newTestAccount() *data.Account {
-	priv, _ := ecdsa.GenerateKey(crypto.S256(), cryptorand.Reader)
-	pub := base64.URLEncoding.EncodeToString(
-		crypto.FromECDSAPub(&priv.PublicKey))
-	addr := hex.EncodeToString(crypto.PubkeyToAddress(priv.PublicKey).Bytes())
-	return &data.Account{
-		ID:         data.NewUUID(),
-		EthAddr:    addr,
-		PublicKey:  pub,
-		PrivateKey: base64.URLEncoding.EncodeToString(crypto.FromECDSA(priv)),
 	}
 }
 
