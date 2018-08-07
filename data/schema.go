@@ -33,3 +33,15 @@ type Account struct {
 	PSCBalance uint64    `json:"psc_balance" reform:"psc_balance"`
 	EthBalance B64BigInt `json:"ethBalance" reform:"eth_balance"`
 }
+
+// Channel is a state channel.
+//reform:channels
+type Channel struct {
+	ID               string  `reform:"id,pk"`
+	Agent            string  `reform:"agent"`
+	Client           string  `reform:"client"`
+	Closed           bool    `reform:"closed"`
+	TotalDeposit     uint    `reform:"total_deposit"`
+	ReceiptBalance   uint    `reform:"receipt_balance"`
+	ReceiptSignature *string `reform:"receipt_signature"`
+}
