@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -134,5 +135,14 @@ func TestAfterChannelCreated(t *testing.T) {
 	channel := &data.Channel{}
 	if err := db.FindOneTo(channel, "agent", acc.EthAddr); err != nil {
 		t.Fatal(err)
+	}
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("session start was not send")
+	case id := <-worker.sessStart:
+		if channel.ID != id {
+			t.Fatal("wrong channel id was send to session start")
+		}
 	}
 }

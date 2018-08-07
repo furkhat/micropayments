@@ -92,17 +92,7 @@ func (m *Monitor) Start() {
 func (m *Monitor) start(ticker <-chan time.Time) {
 	go func() {
 		for {
-			select {
-			case <-ticker:
-				m.collect()
-			case <-m.exit:
-				return
-			}
-		}
-	}()
-	go func() {
-		lastUpdate := m.lastSeenBlock
-		for {
+			lastUpdate := m.lastSeenBlock
 			select {
 			case log := <-m.ethlogChan:
 				if len(log.Topics) > 0 {
@@ -116,12 +106,20 @@ func (m *Monitor) start(ticker <-chan time.Time) {
 				if log.BlockNumber > lastUpdate {
 					m.updateLastSeenBlock(int(log.BlockNumber))
 				}
-
 			case <-m.exit:
 				return
 			}
 		}
 	}()
+
+	for {
+		select {
+		case <-ticker:
+			m.collect()
+		case <-m.exit:
+			return
+		}
+	}
 }
 
 func (m *Monitor) updateLastSeenBlock(num int) {

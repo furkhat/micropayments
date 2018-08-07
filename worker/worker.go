@@ -34,11 +34,13 @@ type EthBack interface {
 type Worker struct {
 	db      *reform.DB
 	ethBack EthBack
+
+	sessStart chan string
 }
 
 // NewWorker creates a Worker.
 func NewWorker(db *reform.DB, ethBack EthBack) *Worker {
-	return &Worker{db, ethBack}
+	return &Worker{db, ethBack, make(chan string)}
 }
 
 // AfterApprove transfers all approved amount to the spender.
@@ -76,9 +78,9 @@ func (w *Worker) AfterTransfer(transferLog *ethtypes.Log) error {
 
 // AfterChannelCreated registers channel in the system.
 func (w *Worker) AfterChannelCreated(log *ethtypes.Log) error {
-	acc, err := w.accountByHash(log.Topics[1])
+	_, err := w.accountByHash(log.Topics[1])
 	if err == sql.ErrNoRows {
-		return nil
+		_, err = w.accountByHash(log.Topics[2])
 	}
 	if err != nil {
 		return err
@@ -90,13 +92,21 @@ func (w *Worker) AfterChannelCreated(log *ethtypes.Log) error {
 	}
 	amount := args[0].(*big.Int)
 
+	agentAddr := hex.EncodeToString(log.Topics[1].Bytes())
 	clientAddr := hex.EncodeToString(log.Topics[2].Bytes())
-	return w.db.Insert(&data.Channel{
-		ID:           data.NewUUID(),
-		Agent:        acc.EthAddr,
+	id := data.NewUUID()
+	err = w.db.Insert(&data.Channel{
+		ID:           id,
+		Agent:        strings.TrimLeft(agentAddr, "0"),
 		Client:       strings.TrimLeft(clientAddr, "0"),
 		TotalDeposit: amount.Uint64(),
 	})
+	if err != nil {
+		return err
+	}
+
+	go func() { w.sessStart <- id }()
+	return nil
 }
 
 // AfterChannelClose update accounts PTC, PSC and ethereum balances.

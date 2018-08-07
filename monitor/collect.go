@@ -23,7 +23,6 @@ func (m *Monitor) collect() {
 
 	addresses, err := m.getAddresses()
 	if err != nil {
-		fmt.Println(err)
 		m.errChan <- err
 		return
 	}

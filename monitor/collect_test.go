@@ -25,7 +25,7 @@ func TestCollectQuery(t *testing.T) {
 	ticker := newMockTicker()
 	go td.mon.start(ticker.C)
 	ticker.tick()
-	time.Sleep(time.Millisecond * time.Duration(30))
+	time.Sleep(time.Millisecond * time.Duration(100))
 
 	addresses := []common.Hash{common.HexToAddress(acc.EthAddr).Hash()}
 	expected := []ethereum.FilterQuery{
@@ -68,7 +68,7 @@ func TestHandlerCalls(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(4)
-	success := make(chan struct{})
+	success := make(chan struct{}, 1)
 	go func() {
 		wg.Wait()
 		success <- struct{}{}
@@ -90,15 +90,6 @@ func TestHandlerCalls(t *testing.T) {
 	}
 
 	if td.mon.lastSeenBlock != 103 {
-		t.Fatal("last seen block not updated")
-	}
-
-	blockSettings := &data.Setting{}
-	err := db.FindByPrimaryKeyTo(blockSettings, data.SettingsLastSeenBlock)
-	if err != nil {
-		t.Fatal("could not find last seen block settings: ", err)
-	}
-	if blockSettings.Value != "103" {
 		t.Fatal("last seen block not updated")
 	}
 }

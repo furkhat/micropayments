@@ -19,6 +19,8 @@ type fakeEthConn struct {
 	filterQueries []ethereum.FilterQuery
 	fakeLogs      []ethtypes.Log
 	lastBlock     uint64
+
+	filterCall chan struct{}
 }
 
 func (c *fakeEthConn) FilterLogs(ctx context.Context,
@@ -73,7 +75,10 @@ type testdata struct {
 }
 
 func newTestData(t *testing.T, lastBlock, lastSeen uint64) *testdata {
-	fakeConn := &fakeEthConn{lastBlock: lastBlock}
+	fakeConn := &fakeEthConn{
+		lastBlock:  lastBlock,
+		filterCall: make(chan struct{}),
+	}
 	if lastSeen > 0 {
 		insertToTestDB(t, &data.Setting{
 			Key:   data.SettingsLastSeenBlock,
