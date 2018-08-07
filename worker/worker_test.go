@@ -136,7 +136,3 @@ func TestAfterChannelCreated(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-func TestAfterChannelClose(t *testing.T) {
-	t.Skip("TODO")
-}

@@ -100,7 +100,11 @@ func (w *Worker) AfterChannelCreated(log *ethtypes.Log) error {
 }
 
 // AfterChannelClose update accounts PTC, PSC and ethereum balances.
-func (w *Worker) AfterChannelClose(transferLog *ethtypes.Log) error {
+func (w *Worker) AfterChannelClose(closeLog *ethtypes.Log) error {
+	err := w.updateAccountBalances(closeLog.Topics[1])
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
 	return nil
 }
 
