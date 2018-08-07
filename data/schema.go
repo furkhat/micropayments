@@ -41,8 +41,8 @@ type Channel struct {
 	Agent            string  `reform:"agent"`
 	Client           string  `reform:"client"`
 	Closed           bool    `reform:"closed"`
-	TotalDeposit     uint    `reform:"total_deposit"`
-	ReceiptBalance   uint    `reform:"receipt_balance"`
+	TotalDeposit     uint64  `reform:"total_deposit"`
+	ReceiptBalance   uint64  `reform:"receipt_balance"`
 	ReceiptSignature *string `reform:"receipt_signature"`
 }
 

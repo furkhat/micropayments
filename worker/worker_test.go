@@ -1,8 +1,10 @@
 package worker
 
 import (
+	"encoding/base64"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -40,7 +42,7 @@ func TestAfterApprove(t *testing.T) {
 	defer db.Delete(owner)
 	spender := common.HexToAddress("0xaaaaaa")
 	approvedAmount := int64(123)
-	logData, err := approvalNonIndexArgs.Pack(big.NewInt(approvedAmount))
+	logData, _ := approvalNonIndexArgs.Pack(big.NewInt(approvedAmount))
 	approveLog := &ethtypes.Log{
 		Address: pscAddr,
 		Topics: []common.Hash{
@@ -51,7 +53,7 @@ func TestAfterApprove(t *testing.T) {
 		Data: logData,
 	}
 
-	err = worker.AfterApprove(approveLog)
+	err := worker.AfterApprove(approveLog)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,13 +64,79 @@ func TestAfterApprove(t *testing.T) {
 }
 
 func TestAfterTransfer(t *testing.T) {
-	t.Skip("TODO")
+	acc1 := data.NewAccount()
+	db.Insert(acc1)
+	defer db.Delete(acc1)
+
+	acc2 := data.NewAccount()
+	db.Insert(acc2)
+	defer db.Delete(acc2)
+
+	transferLog := &ethtypes.Log{
+		Address: pscAddr,
+		Topics: []common.Hash{
+			contract.EthTokenTransfer,
+			common.HexToHash(acc1.EthAddr),
+			common.HexToHash(acc2.EthAddr),
+		},
+	}
+
+	testEthBack.balanceEth = big.NewInt(10)
+	testEthBack.balancePSC = big.NewInt(20)
+	testEthBack.balancePTC = big.NewInt(30)
+	expectedEth := base64.URLEncoding.EncodeToString(big.NewInt(10).Bytes())
+	expectedPSC := uint64(20)
+	expectedPTC := uint64(30)
+
+	err := worker.AfterTransfer(transferLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db.Reload(acc1)
+	db.Reload(acc2)
+
+	if strings.TrimSpace(string(acc1.EthBalance)) != expectedEth ||
+		acc1.PSCBalance != expectedPSC || acc1.PTCBalance != expectedPTC {
+		t.Fatalf("balance of sender not updated")
+	}
+
+	if strings.TrimSpace(string(acc2.EthBalance)) != expectedEth ||
+		acc2.PSCBalance != expectedPSC || acc2.PTCBalance != expectedPTC {
+		t.Fatal("balance of receiver not updated")
+	}
 }
 
-func AfterChannelCreated(t *testing.T) {
-	t.Skip("TODO")
+func TestAfterChannelCreated(t *testing.T) {
+	acc := data.NewAccount()
+	db.Insert(acc)
+	defer db.Delete(acc)
+
+	deposit := int64(123)
+	logData, _ := channelCreatedNonIndexArgs.Pack(big.NewInt(deposit),
+		common.HexToHash("0x0"))
+	channelCreatedLog := &ethtypes.Log{
+		Address: pscAddr,
+		Topics: []common.Hash{
+			contract.EthTokenApproval,
+			common.HexToHash(acc.EthAddr),
+			common.HexToHash("0x001"),
+			common.BytesToHash([]byte{}),
+		},
+		Data: logData,
+	}
+
+	err := worker.AfterChannelCreated(channelCreatedLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	channel := &data.Channel{}
+	if err := db.FindOneTo(channel, "agent", acc.EthAddr); err != nil {
+		t.Fatal(err)
+	}
 }
 
-func AfterChannelClose(t *testing.T) {
+func TestAfterChannelClose(t *testing.T) {
 	t.Skip("TODO")
 }

@@ -2,7 +2,11 @@ package worker
 
 import (
 	"context"
+	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -39,35 +43,102 @@ func NewWorker(db *reform.DB, ethBack EthBack) *Worker {
 
 // AfterApprove transfers all approved amount to the spender.
 func (w *Worker) AfterApprove(approveLog *ethtypes.Log) error {
-	accAddr := approveLog.Topics[1].Hex()
-	acc := &data.Account{}
-	if err := w.db.SelectOneTo(acc, "WHERE eth_addr=substr($1, 27)", accAddr); err != nil {
-		return err
-	}
-	auth, err := accTransactOpts(acc)
+	acc, err := w.accountByHash(approveLog.Topics[1])
 	if err != nil {
 		return err
 	}
+
+	auth, err := accTransactOpts(acc)
 	auth.GasLimit = gasLimitAddBalanceERC20
+	if err != nil {
+		return err
+	}
+
 	args, err := approvalNonIndexArgs.UnpackValues(approveLog.Data)
 	if err != nil {
 		return err
 	}
+
 	_, err = w.ethBack.PSCAddBalanceERC20(auth, args[0].(*big.Int))
 	return err
 }
 
 // AfterTransfer update accounts PTC, PSC and ethereum balances.
 func (w *Worker) AfterTransfer(transferLog *ethtypes.Log) error {
+	if err := w.updateAccountBalances(transferLog.Topics[1]); err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err := w.updateAccountBalances(transferLog.Topics[2]); err != nil && err != sql.ErrNoRows {
+		return err
+	}
 	return nil
 }
 
 // AfterChannelCreated registers channel in the system.
-func (w *Worker) AfterChannelCreated(transferLog *ethtypes.Log) error {
-	return nil
+func (w *Worker) AfterChannelCreated(log *ethtypes.Log) error {
+	acc, err := w.accountByHash(log.Topics[1])
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	args, err := channelCreatedNonIndexArgs.NonIndexed().UnpackValues(log.Data)
+	if err != nil {
+		return err
+	}
+	amount := args[0].(*big.Int)
+
+	clientAddr := hex.EncodeToString(log.Topics[2].Bytes())
+	return w.db.Insert(&data.Channel{
+		ID:           data.NewUUID(),
+		Agent:        acc.EthAddr,
+		Client:       strings.TrimLeft(clientAddr, "0"),
+		TotalDeposit: amount.Uint64(),
+	})
 }
 
 // AfterChannelClose update accounts PTC, PSC and ethereum balances.
 func (w *Worker) AfterChannelClose(transferLog *ethtypes.Log) error {
 	return nil
+}
+
+func (w *Worker) updateAccountBalances(addrHash common.Hash) error {
+	acc, err := w.accountByHash(addrHash)
+	if err != nil {
+		return err
+	}
+
+	accAddr := common.HexToAddress(acc.EthAddr)
+
+	amount, err := w.ethBack.PTCBalanceOf(&bind.CallOpts{}, accAddr)
+	if err != nil {
+		return err
+	}
+
+	acc.PTCBalance = amount.Uint64()
+
+	amount, err = w.ethBack.PSCBalanceOf(&bind.CallOpts{}, accAddr)
+	if err != nil {
+		return err
+	}
+
+	acc.PSCBalance = amount.Uint64()
+
+	amount, err = w.ethBack.EthBalanceAt(context.Background(), accAddr)
+	if err != nil {
+		return err
+	}
+
+	acc.EthBalance = data.B64BigInt(base64.URLEncoding.EncodeToString(amount.Bytes()))
+
+	return w.db.Update(acc)
+}
+
+func (w *Worker) accountByHash(addrHash common.Hash) (*data.Account, error) {
+	accAddr := addrHash.Hex()
+	acc := &data.Account{}
+	err := w.db.SelectOneTo(acc, "WHERE eth_addr=substr($1, 27)", accAddr)
+	return acc, err
 }
