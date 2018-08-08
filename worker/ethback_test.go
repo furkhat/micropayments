@@ -19,24 +19,23 @@ type testEthBackCall struct {
 }
 
 type testEthBackend struct {
-	callStack  []testEthBackCall
-	balanceEth *big.Int
-	balancePSC *big.Int
-	balancePTC *big.Int
+	callStack       []testEthBackCall
+	balanceEth      *big.Int
+	balanceContract *big.Int
 }
 
 func newTestEthBackend() *testEthBackend {
 	return &testEthBackend{}
 }
 
-func (b *testEthBackend) PSCCooperativeClose(opts *bind.TransactOpts,
-	agentAddr common.Address, block uint32, offeringHash [32]byte,
-	balance *big.Int, balanceMsgSig []byte, ClosingSig []byte) (*types.Transaction, error) {
+func (b *testEthBackend) CloseChannel(opts *bind.TransactOpts,
+	agentAddr common.Address, block uint32, balance *big.Int,
+	balanceMsgSig []byte, ClosingSig []byte) (*types.Transaction, error) {
 	b.callStack = append(b.callStack, testEthBackCall{
 		method: "PSCCooperativeClose",
 		caller: opts.From,
 		txOpts: opts,
-		args: []interface{}{agentAddr, block, offeringHash, balance,
+		args: []interface{}{agentAddr, block, balance,
 			balanceMsgSig, ClosingSig},
 	})
 	tx := types.NewTransaction(0, common.Address{}, big.NewInt(1), 1, big.NewInt(1), nil)
@@ -52,48 +51,14 @@ func (b *testEthBackend) EthBalanceAt(_ context.Context,
 	return b.balanceEth, nil
 }
 
-func (b *testEthBackend) PTCBalanceOf(opts *bind.CallOpts,
+func (b *testEthBackend) ContractBalanceOf(opts *bind.CallOpts,
 	addr common.Address) (*big.Int, error) {
 	b.callStack = append(b.callStack, testEthBackCall{
-		method: "PTCBalanceOf",
+		method: "ContractBalanceOf",
 		caller: opts.From,
 		args:   []interface{}{addr},
 	})
-	return b.balancePTC, nil
-}
-
-func (b *testEthBackend) PSCBalanceOf(opts *bind.CallOpts,
-	addr common.Address) (*big.Int, error) {
-	b.callStack = append(b.callStack, testEthBackCall{
-		method: "PSCBalanceOf",
-		caller: opts.From,
-		args:   []interface{}{addr},
-	})
-	return b.balancePSC, nil
-}
-
-func (b *testEthBackend) PTCIncreaseApproval(opts *bind.TransactOpts,
-	addr common.Address, amount *big.Int) (*types.Transaction, error) {
-	b.callStack = append(b.callStack, testEthBackCall{
-		method: "PTCIncreaseApproval",
-		caller: opts.From,
-		txOpts: opts,
-		args:   []interface{}{addr, amount},
-	})
-	tx := types.NewTransaction(0, common.Address{}, big.NewInt(1), 1, big.NewInt(1), nil)
-	return tx, nil
-}
-
-func (b *testEthBackend) PSCAddBalanceERC20(opts *bind.TransactOpts,
-	val *big.Int) (*types.Transaction, error) {
-	b.callStack = append(b.callStack, testEthBackCall{
-		method: "PSCAddBalanceERC20",
-		caller: opts.From,
-		txOpts: opts,
-		args:   []interface{}{val},
-	})
-	tx := types.NewTransaction(0, common.Address{}, big.NewInt(1), 1, big.NewInt(1), nil)
-	return tx, nil
+	return b.balanceContract, nil
 }
 
 func (b *testEthBackend) testCalled(t *testing.T, method string,
@@ -118,13 +83,12 @@ const (
 	testTXGasPrice int64  = 1
 )
 
-func (b *testEthBackend) PSCCreateChannel(opts *bind.TransactOpts,
-	agent common.Address, hash [common.HashLength]byte,
-	deposit *big.Int) (*types.Transaction, error) {
+func (b *testEthBackend) CreateChannel(opts *bind.TransactOpts,
+	agent common.Address, deposit *big.Int) (*types.Transaction, error) {
 	b.callStack = append(b.callStack, testEthBackCall{
 		method: "PSCCreateChannel",
 		caller: opts.From,
-		args:   []interface{}{agent, hash, deposit},
+		args:   []interface{}{agent, deposit},
 	})
 
 	tx := types.NewTransaction(

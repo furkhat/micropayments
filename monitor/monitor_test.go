@@ -85,7 +85,7 @@ func newTestData(t *testing.T, lastBlock, lastSeen uint64) *testdata {
 			Value: "10",
 		})
 	}
-	mon, err := NewMonitor(db, fakeConn, 1, pscAddr, ptcAddr)
+	mon, err := NewMonitor(db, fakeConn, 1, contractAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,9 +97,8 @@ func (d *testdata) cleanUp(t *testing.T) {
 }
 
 var (
-	ptcAddr = common.HexToAddress("0x123")
-	pscAddr = common.HexToAddress("0xabc")
-	db      *reform.DB
+	contractAddr = common.HexToAddress("0xabc")
+	db           *reform.DB
 )
 
 func TestMain(m *testing.M) {

@@ -32,13 +32,13 @@ func TestCollectQuery(t *testing.T) {
 		{
 			FromBlock: new(big.Int).SetUint64(11),
 			ToBlock:   new(big.Int).SetUint64(99),
-			Addresses: []common.Address{pscAddr, ptcAddr},
+			Addresses: []common.Address{contractAddr},
 			Topics:    [][]common.Hash{nil, addresses},
 		},
 		{
 			FromBlock: new(big.Int).SetUint64(11),
 			ToBlock:   new(big.Int).SetUint64(99),
-			Addresses: []common.Address{pscAddr, ptcAddr},
+			Addresses: []common.Address{contractAddr},
 			Topics:    [][]common.Hash{nil, nil, addresses},
 		},
 	}
@@ -54,20 +54,14 @@ func TestHandlerCalls(t *testing.T) {
 
 	td.fakeConn.fakeLogs = []ethtypes.Log{
 		ethtypes.Log{
-			Topics:      []common.Hash{contract.EthTokenApproval},
-			BlockNumber: 100},
-		ethtypes.Log{
-			Topics:      []common.Hash{contract.EthTokenTransfer},
-			BlockNumber: 101},
-		ethtypes.Log{
-			Topics:      []common.Hash{contract.EthCooperativeChannelClose},
+			Topics:      []common.Hash{contract.EthChannelClosed},
 			BlockNumber: 102},
 		ethtypes.Log{
 			Topics:      []common.Hash{contract.EthChannelCreated},
 			BlockNumber: 103},
 	}
 	var wg sync.WaitGroup
-	wg.Add(4)
+	wg.Add(2)
 	success := make(chan struct{}, 1)
 	go func() {
 		wg.Wait()
@@ -77,9 +71,7 @@ func TestHandlerCalls(t *testing.T) {
 		wg.Done()
 		return nil
 	}
-	td.mon.RegisterWorker(contract.EthTokenApproval, markOneDone)
-	td.mon.RegisterWorker(contract.EthTokenTransfer, markOneDone)
-	td.mon.RegisterWorker(contract.EthCooperativeChannelClose, markOneDone)
+	td.mon.RegisterWorker(contract.EthChannelClosed, markOneDone)
 	td.mon.RegisterWorker(contract.EthChannelCreated, markOneDone)
 	go td.mon.Start()
 

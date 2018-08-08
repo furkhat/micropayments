@@ -16,18 +16,14 @@ import (
 	reform "gopkg.in/reform.v1"
 )
 
-// EthBack defines a typed wrappers for the PSC, PTC contracts and ethereum methods used by the worker.
+// EthBack defines a typed wrappers for contract and ethereum methods used by the worker.
 type EthBack interface {
 	EthBalanceAt(context.Context, common.Address) (*big.Int, error)
 
-	PSCBalanceOf(*bind.CallOpts, common.Address) (*big.Int, error)
+	ContractBalanceOf(*bind.CallOpts, common.Address) (*big.Int, error)
 
-	PSCCooperativeClose(*bind.TransactOpts, common.Address, uint32,
-		[common.HashLength]byte, *big.Int, []byte, []byte) (*types.Transaction, error)
-
-	PSCAddBalanceERC20(*bind.TransactOpts, *big.Int) (*types.Transaction, error)
-
-	PTCBalanceOf(*bind.CallOpts, common.Address) (*big.Int, error)
+	CloseChannel(*bind.TransactOpts, common.Address, uint32,
+		*big.Int, []byte, []byte) (*types.Transaction, error)
 }
 
 // Worker defines methods for processing ethereum logs.
@@ -41,39 +37,6 @@ type Worker struct {
 // NewWorker creates a Worker.
 func NewWorker(db *reform.DB, ethBack EthBack) *Worker {
 	return &Worker{db, ethBack, make(chan string)}
-}
-
-// AfterApprove transfers all approved amount to the spender.
-func (w *Worker) AfterApprove(approveLog *ethtypes.Log) error {
-	acc, err := w.accountByHash(approveLog.Topics[1])
-	if err != nil {
-		return err
-	}
-
-	auth, err := accTransactOpts(acc)
-	auth.GasLimit = gasLimitAddBalanceERC20
-	if err != nil {
-		return err
-	}
-
-	args, err := approvalNonIndexArgs.UnpackValues(approveLog.Data)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.ethBack.PSCAddBalanceERC20(auth, args[0].(*big.Int))
-	return err
-}
-
-// AfterTransfer update accounts PTC, PSC and ethereum balances.
-func (w *Worker) AfterTransfer(transferLog *ethtypes.Log) error {
-	if err := w.updateAccountBalances(transferLog.Topics[1]); err != nil && err != sql.ErrNoRows {
-		return err
-	}
-	if err := w.updateAccountBalances(transferLog.Topics[2]); err != nil && err != sql.ErrNoRows {
-		return err
-	}
-	return nil
 }
 
 // AfterChannelCreated registers channel in the system.
@@ -105,7 +68,9 @@ func (w *Worker) AfterChannelCreated(log *ethtypes.Log) error {
 		return err
 	}
 
+	// Start selling the service.
 	go func() { w.sessStart <- id }()
+
 	return nil
 }
 
@@ -126,19 +91,12 @@ func (w *Worker) updateAccountBalances(addrHash common.Hash) error {
 
 	accAddr := common.HexToAddress(acc.EthAddr)
 
-	amount, err := w.ethBack.PTCBalanceOf(&bind.CallOpts{}, accAddr)
+	amount, err := w.ethBack.ContractBalanceOf(&bind.CallOpts{}, accAddr)
 	if err != nil {
 		return err
 	}
 
-	acc.PTCBalance = amount.Uint64()
-
-	amount, err = w.ethBack.PSCBalanceOf(&bind.CallOpts{}, accAddr)
-	if err != nil {
-		return err
-	}
-
-	acc.PSCBalance = amount.Uint64()
+	acc.ContractBalance = amount.Uint64()
 
 	amount, err = w.ethBack.EthBalanceAt(context.Background(), accAddr)
 	if err != nil {

@@ -41,26 +41,6 @@ type Monitor struct {
 	workers map[common.Hash]WorkerFunc
 }
 
-// NewMonitor creates a Monitor for given url.
-func NewMonitor(db *reform.DB, ethConn EthConn, period int64,
-	pscAddr, ptcAddr common.Address) (*Monitor, error) {
-	number, err := lastSeenBlockNumber(db)
-	if err != nil {
-		return nil, err
-	}
-	return &Monitor{
-		contracts:     []common.Address{pscAddr, ptcAddr},
-		db:            db,
-		ethConn:       ethConn,
-		errChan:       make(chan error),
-		ethlogChan:    make(chan *ethtypes.Log),
-		exit:          make(chan struct{}),
-		lastSeenBlock: number,
-		period:        period,
-		workers:       map[common.Hash]WorkerFunc{},
-	}, nil
-}
-
 func lastSeenBlockNumber(db *reform.DB) (uint64, error) {
 	setting := &data.Setting{}
 	err := db.FindByPrimaryKeyTo(setting, data.SettingsLastSeenBlock)
@@ -78,9 +58,34 @@ func lastSeenBlockNumber(db *reform.DB) (uint64, error) {
 	return strconv.ParseUint(setting.Value, 10, 64)
 }
 
-// RegisterWorker registers a worker for an ethereum log.
-func (m *Monitor) RegisterWorker(logDigest common.Hash, f WorkerFunc) {
-	m.workers[logDigest] = f
+func (m *Monitor) updateLastSeenBlock(num int) {
+	settings := &data.Setting{
+		Key:   data.SettingsLastSeenBlock,
+		Value: strconv.Itoa(num),
+	}
+	if err := m.db.Update(settings); err != nil {
+		m.errChan <- err
+	}
+}
+
+// NewMonitor creates a Monitor for given url.
+func NewMonitor(db *reform.DB, ethConn EthConn, period int64,
+	contractAddr common.Address) (*Monitor, error) {
+	number, err := lastSeenBlockNumber(db)
+	if err != nil {
+		return nil, err
+	}
+	return &Monitor{
+		contracts:     []common.Address{contractAddr},
+		db:            db,
+		ethConn:       ethConn,
+		errChan:       make(chan error),
+		ethlogChan:    make(chan *ethtypes.Log),
+		exit:          make(chan struct{}),
+		lastSeenBlock: number,
+		period:        period,
+		workers:       map[common.Hash]WorkerFunc{},
+	}, nil
 }
 
 // Start opens a connection and starts monitoring process.
@@ -122,23 +127,17 @@ func (m *Monitor) start(ticker <-chan time.Time) {
 	}
 }
 
-func (m *Monitor) updateLastSeenBlock(num int) {
-	settings := &data.Setting{
-		Key:   data.SettingsLastSeenBlock,
-		Value: strconv.Itoa(num),
-	}
-	if err := m.db.Update(settings); err != nil {
-		m.errChan <- err
-	}
-}
-
 // Stop stops monitoring process and closes the connection.
 func (m *Monitor) Stop() {
-	m.ethConn.Close()
 	m.exit <- struct{}{}
 }
 
 // Err returns the first unprocessed error that was encountered during monitoring.
 func (m *Monitor) Err() error {
 	return <-m.errChan
+}
+
+// RegisterWorker registers a worker for an ethereum log.
+func (m *Monitor) RegisterWorker(logDigest common.Hash, f WorkerFunc) {
+	m.workers[logDigest] = f
 }

@@ -1,0 +1,123 @@
+[
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "_address",
+				"type": "address"
+			}
+		],
+		"name": "balanceOf",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"name": "_agent",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"name": "_client",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"name": "_deposit",
+				"type": "uint192"
+			},
+			{
+				"indexed": false,
+				"name": "_authentication_hash",
+				"type": "bytes32"
+			}
+		],
+		"name": "LogChannelCreated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"name": "_agent",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"name": "_client",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"name": "_open_block_number",
+				"type": "uint32"
+			},
+			{
+				"indexed": false,
+				"name": "_balance",
+				"type": "uint192"
+			}
+		],
+		"name": "LogChannelClosed",
+		"type": "event"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "_agent_address",
+				"type": "address"
+			},
+			{
+				"name": "_deposit",
+				"type": "uint192"
+			}
+		],
+		"name": "createChannel",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "_agent_address",
+				"type": "address"
+			},
+			{
+				"name": "_open_block_number",
+				"type": "uint32"
+			},
+			{
+				"name": "_balance",
+				"type": "uint192"
+			},
+			{
+				"name": "_balance_msg_sig",
+				"type": "bytes"
+			},
+			{
+				"name": "_closing_sig",
+				"type": "bytes"
+			}
+		],
+		"name": "closeChannel",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+]

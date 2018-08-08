@@ -25,13 +25,12 @@ func (i B64BigInt) MarshalJSON() ([]byte, error) {
 // Account is an ethereum account.
 //reform:accounts
 type Account struct {
-	ID         string    `reform:"id,pk"`
-	EthAddr    string    `reform:"eth_addr"`
-	PublicKey  string    `reform:"public_key"`
-	PrivateKey string    `reform:"private_key"`
-	PTCBalance uint64    `json:"ptcBalance" reform:"ptc_balance"`
-	PSCBalance uint64    `json:"psc_balance" reform:"psc_balance"`
-	EthBalance B64BigInt `json:"ethBalance" reform:"eth_balance"`
+	ID              string    `reform:"id,pk"`
+	EthAddr         string    `reform:"eth_addr"`
+	PublicKey       string    `reform:"public_key"`
+	PrivateKey      string    `reform:"private_key"`
+	ContractBalance uint64    `reform:"contract_balance"`
+	EthBalance      B64BigInt `reform:"eth_balance"`
 }
 
 // Channel is a state channel.
